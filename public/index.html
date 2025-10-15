@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Downloader</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f6; color: #333; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 1rem; box-sizing: border-box; }
+        .container { background: white; padding: 2rem 3rem; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; max-width: 500px; width: 100%; }
+        h1 { color: #d9230f; margin-bottom: 1.5rem; }
+        input[type="url"] { width: 95%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem; margin-bottom: 1rem; }
+        .format-options { display: flex; justify-content: center; gap: 1rem; margin-bottom: 1.5rem; }
+        button { background-color: #ff0000; color: white; border: none; padding: 12px 25px; border-radius: 5px; font-size: 1rem; cursor: pointer; transition: background-color 0.3s; }
+        button:hover { background-color: #c00000; }
+        button:disabled { background-color: #cccccc; cursor: not-allowed; }
+        #status-area { margin-top: 1.5rem; font-weight: bold; }
+        .status-completed { color: #155724; }
+        .status-failed { color: #721c24; }
+        .status-active { color: #004085; }
+        #download-link { display: none; margin-top: 1rem; }
+        a.download-button { display: inline-block; background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>YouTube Downloader</h1>
+        
+        <form id="download-form">
+            <input type="url" name="url" id="url-input" placeholder="Enter YouTube Video URL" required>
+            <div class="format-options">
+                <label><input type="radio" name="format" value="mp4" checked> MP4</label>
+                <label><input type="radio" name="format" value="mp3"> MP3</label>
+            </div>
+            <button type="submit" id="submit-btn">Download</button>
+        </form>
+
+        <div id="status-area"></div>
+        <div id="download-link"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('download-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const statusArea = document.getElementById('status-area');
+        const downloadLinkArea = document.getElementById('download-link');
+        const urlInput = document.getElementById('url-input');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Processing...';
+            statusArea.innerHTML = '';
+            downloadLinkArea.innerHTML = '';
+            
+            const formData = new URLSearchParams(new FormData(form)).toString();
+            
+            try {
+                // Step 1: Start the download job
+                const startResponse = await fetch('/start-download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData,
+                });
+
+                if (!startResponse.ok) throw new Error('Failed to start download process.');
+
+                const data = await startResponse.json();
+                pollStatus(data.jobId);
+
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'failed');
+                resetForm();
+            }
+        });
+
+        function pollStatus(jobId) {
+            const interval = setInterval(async () => {
+                try {
+                    const statusResponse = await fetch(`/status/${jobId}`);
+                    const data = await statusResponse.json();
+
+                    showStatus(`Status: ${data.state}`, data.state);
+
+                    if (data.state === 'completed') {
+                        clearInterval(interval);
+                        showDownloadLink(data.result.filename);
+                        resetForm();
+                    } else if (data.state === 'failed') {
+                        clearInterval(interval);
+                        showStatus('Task Failed. Please check the URL and try again.', 'failed');
+                        resetForm();
+                    }
+                } catch (error) {
+                    clearInterval(interval);
+                    showStatus('Error fetching status.', 'failed');
+                    resetForm();
+                }
+            }, 3000); // Poll every 3 seconds
+        }
+
+        function showStatus(message, type) {
+            statusArea.className = `status-${type}`;
+            statusArea.innerText = message;
+        }
+
+        function showDownloadLink(filename) {
+            downloadLinkArea.style.display = 'block';
+            downloadLinkArea.innerHTML = `<a href="/downloads/${filename}" class="download-button" download>Click Here to Download File</a>`;
+        }
+
+        function resetForm() {
+            submitBtn.disabled = false;
+            submitBtn.innerText = 'Download';
+        }
+    </script>
+</body>
+</html>
