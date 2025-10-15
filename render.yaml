@@ -3,11 +3,9 @@ services:
   - type: redis
     name: redis
     plan: free
-    # --- ADD THIS SECTION ---
     ipAllowList:
-      - ip: 0.0.0.0/0
+      - source: 0.0.0.0/0 # The fix is here: changed 'ip' to 'source'
         description: "Allow all internal traffic"
-    # ----------------------
 
   # 2. The Web Server
   - type: web
