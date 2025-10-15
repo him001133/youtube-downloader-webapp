@@ -1,0 +1,32 @@
+services:
+  # 1. The Redis Database
+  - type: redis
+    name: redis
+    plan: free # Use the free instance type
+
+  # 2. The Web Server
+  - type: web
+    name: web
+    env: node
+    plan: free # Use the free instance type
+    startCommand: "node server.js"
+    healthCheckPath: /
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: redis
+          property: connectionString
+
+  # 3. The Background Worker
+  - type: worker
+    name: worker
+    env: node
+    plan: free # Use the free instance type
+    startCommand: "node worker.js"
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: redis
+          property: connectionString
